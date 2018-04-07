@@ -1,57 +1,138 @@
 
-#ifndef _DEFINITIONS_H
-#define _DEFINITIONS_H
+#pragma once
 
 #include <SerialCommands.h>
+#include "Arduino.h"
 
-#define CMD_ON    "ON"
-#define CMD_OFF   "OFF"
-#define CMD_READ  "READ"
-#define CMD_ALL   "ALL"
-#define CMD_MODE  "MODE"
+class Pins {
+    public:
+        uint8_t mode, pin;
+        const char* name;
+        Pins() {
+            mode = -1;
+            pin = -1;
+            name = '\0';
+        }
+        Pins(uint8_t m, uint8_t p, const char* n) {
+            mode = m;
+            pin = p;
+            name = n;
+            pinMode(p, m);
+            if(m) digitalWrite(p, HIGH);
+        }
+};
+
+extern Pins pins[11];
+
+Pins getPin(const Pins (*ptr)[11], uint8_t _pin) {
+    int z = sizeof(*ptr) / (sizeof(ptr) * 2);
+    for(int i = 0; i <= z; i++) {
+        if( _pin == ((*ptr)[i]).pin) {
+            return ((*ptr)[i]);
+        }
+    }
+}
+
+Pins findPin(const Pins (*ptr)[11], const char* n) {
+    int z = sizeof(*ptr) / (sizeof(ptr) * 2);
+    for(int i = 0; i <= z; i++) {
+        if( n == ((*ptr)[i]).name)
+            return ((*ptr)[i]);
+    }
+}
+
+void printAll(const Pins (*ptr)[11]) {
+    int z = sizeof(*ptr) / (sizeof(ptr) * 2);
+    for(int i = 2; i <= 13; i++) {
+        Pins p = getPin(ptr, i);
+        if(p.name == '\0') continue;
+        Serial.print(p.name);
+        //Serial.print((*ptr)[i].name);
+        Serial.print(", ");
+        Serial.println(p.pin);
+    }
+}
+
+#define null
+
+#define CMD_ON      "ON"
+#define CMD_OFF     "OFF"
+#define CMD_READ    "READ"
+#define CMD_ALL     "ALL"
+#define CMD_MODE    "MODE"
 #define ERROR_RESP  "ERROR"
-#define CMD       "cmd"
+#define CMD          "cmd"
 
-#define HELP  'H'
-#define WRITE 'w'
-#define ON    HIGH
-#define OFF   LOW
-#define READ  'R'
-#define MODE  'M'
-#define PWM   'P'
-#define ALL   'A'
-
+#define HELP    'H'
+#define WRITE   'w'
+#define ON      HIGH
+#define OFF     LOW
+#define READ    'R'
+#define MODE    'M'
+#define PWM     'P'
+#define ALL     'A'
 
 #define PRINT(s) (sender->GetSerial()->print((s)))
 #define PRINTLN(s) (sender->GetSerial()->println((s)))
 #define IS_PWM(p) (((p)==3||(p)==5||(p)==6||p==9||p==10||p==11))
 
-const int testIndPin = 13;
-const int relay3 = 12;
-const int ACRelay = 9;
-const int QWRelay = 10;
-const int battRelay = 11;
-const int lowBattEn = 2;
-const int relayIn = 7;
-const int padSignal = 3;
-const int okc = 6;
-const int remoteSignal = 5;
-
-
-inline bool isValid(const char* cmd)
-{
-    return cmd != NULL;
-}
+inline bool isValid(const char*);
 
 /**
  * Default command handler.
  */
 void cmd_unrecognized(SerialCommands* sender, const char* cmd)
 {
-    PRINT(F("Unrecognized command ["));
-    PRINT(cmd);
-    PRINTLN(']');
-    PRINTLN(F("Usage: cmd <action> <value>\r\n Actions: Write(w), Read(r), PWM(p), Mode(m), AllPins(a)\r\n Values: 1=Write High/Set Input, 0=Write Low/Set Output"));
+    if(!isValid(cmd)) {
+        PRINTLN("Invlid cmd.");
+        return;
+    }
+    String pin_s = String(sender->Next());
+    String val = String(sender->Next());
+    switch(cmd[0])
+    {
+        case HELP:
+        case 'h':
+        default:
+            PRINTLN(F("Usage: cmd <action> <value>\r\n Actions: Write(w), Read(r), PWM(p), Mode(m), AllPins(a)\r\n Values: 1=Write High/Set Input, 0=Write Low/Set Output"));
+            break;
+
+        case 'm':
+        case 'M':
+            PRINTLN(" pin=" + pin_s + "\r\n mode=" + (val.toInt() == 0 ? "INPUT" : "OUTPUT") );
+            pinMode(pin_s.toInt(), (val.toInt() == 0 ? INPUT : OUTPUT ));
+            break;
+
+        case 'W':
+        case WRITE:
+            PRINTLN("Writing to pin " + pin_s + ", Value = " + val);
+            digitalWrite(pin_s.toInt(), val.toInt());
+            break;
+
+        case 'r':
+        case READ:
+            PRINTLN("\r\nReading pin " + pin_s);
+            val = String(digitalRead(pin_s.toInt()));
+            PRINTLN(" Value = " + val);
+            break;
+
+        case 'a':
+        case ALL:
+            PRINTLN("Setting all pins " + val);
+            for(int i = 2; i < 14; i++) {
+                if(i == 7) return;
+                if(val.equals("off"))
+                    digitalWrite(i, LOW);
+                else if(val.equals("on"))
+                    digitalWrite(i, HIGH);
+                else {
+                    PRINTLN(" Invalid parameter: " + val);
+                    break;
+                }
+            }
+            break;
+
+    }
 }
 
 /**
@@ -59,8 +140,9 @@ void cmd_unrecognized(SerialCommands* sender, const char* cmd)
  */
 void handleCommand(SerialCommands* sender, const char* cmd)
 {
-    String pin, val;
-
+    String pin_s, val;
+    int v;
+    PRINTLN("HandleCommand");
     // Switch the proceeding char
     switch(sender->Next()[0])
     {
@@ -72,51 +154,54 @@ void handleCommand(SerialCommands* sender, const char* cmd)
 
         case 'm':
         case 'M':
-            pin = String(sender->Next());
+            pin_s = String(sender->Next());
             val = String(sender->Next());
 
-            PRINTLN(" pin=" + pin + "\r\n mode=" + (val.toInt() == 0 ? "INPUT" : "OUTPUT") );
-            pinMode(pin.toInt(), (val.toInt() == 0 ? INPUT : OUTPUT ));
+            PRINTLN(" pin=" + pin_s + "\r\n mode=" + (val.toInt() == 0 ? "INPUT" : "OUTPUT") );
+            pinMode(pin_s.toInt(), (val.toInt() == 0 ? INPUT : OUTPUT ));
             break;
 
         case 'W':
         case WRITE:
-            pin = String(sender->Next());
+            pin_s = String(sender->Next());
             val = String(sender->Next());
-            PRINTLN("pin=" + pin);
+            PRINTLN("pin=" + pin_s);
             PRINTLN("val=" + val);
-            digitalWrite(pin.toInt(), val.toInt());
+            digitalWrite(pin_s.toInt(), val.toInt());
             break;
 
         case 'r':
         case READ:
-            pin = String(sender->Next());
-            PRINTLN("\r\nReading pin " + pin);
-            val = String(digitalRead(pin.toInt()));
+            pin_s = String(sender->Next());
+            PRINTLN("\r\nReading pin " + pin_s);
+            val = String(digitalRead(pin_s.toInt()));
             PRINTLN(" Value = " + val);
             break;
 
         case 'a':
         case ALL:
-            val = String(sender->Next());
+            // val = String(sender->Next());
+            // const char* s = sender->Next();
+            v = (sender->Next()[1] == 'f' ? LOW : HIGH);
+            PRINTLN("Command All.");
+            // PRINTLN("Value = " + val);
             for(int i = 2; i < 14; i++) {
-                if(i != 7) {
-                    if(val.equals("off"))
-                        digitalWrite(i, LOW);
-                    else if(val.equals("on"))
-                        digitalWrite(i, HIGH);
-                    else {
-                        PRINTLN(" Invalid parameter: " + val);
-                        break;
-                    }
-                }
+                if(i == 7) return;
+                // if(val.indexOf("off") > 0)
+                digitalWrite(i, v);
+                //else if(val.equals("on"))
+                //    digitalWrite(i, HIGH);
+                //else {
+                //    PRINTLN(" Invalid parameter: " + val);
+                //    break;
+                // }
             }
             break;
 
         case PWM:
         case 'p':
-            pin = String(sender->Next());
-            if(IS_PWM(pin.toInt())) {
+            pin_s = String(sender->Next());
+            if(IS_PWM(pin_s.toInt())) {
                 PRINTLN("Is a PWM pin.");
             } else {
                 PRINTLN("Is not a PWM pin.");
@@ -188,7 +273,8 @@ void cmd_mode(SerialCommands* sender, const char* cmd)
  */
 void cmd_read(SerialCommands* sender, const char* cmd)
 {
-    const char* str = sender->Next();
+    handleCommand(sender, cmd);
+    /*const char* str = sender->Next();
     if(!isValid(str))
         PRINTLN(F("NULL Command Recieved."));
     else {
@@ -196,14 +282,15 @@ void cmd_read(SerialCommands* sender, const char* cmd)
         uint8_t p = (uint8_t)pin.toInt();
         String resp = (digitalRead(p) == HIGH) ? "HIGH" : "LOW";
         PRINTLN("Pin" + pin + " is " + resp);
-    }
+    }*/
 }
 
 /**
  * Sets all the digital outputs at once.
  */
-void cmd_all(SerialCommands* sender)
+void cmd_all(SerialCommands* sender, const char* cmd)
 {
+    //handleCommand(sender, cmd);
     const char* str = sender->Next();
     if (!isValid(str))
         PRINTLN(F("NULL Command Recieved."));
@@ -215,4 +302,7 @@ void cmd_all(SerialCommands* sender)
     }
 }
 
-#endif
+inline bool isValid(const char* cmd)
+{
+    return (cmd != NULL);
+}
