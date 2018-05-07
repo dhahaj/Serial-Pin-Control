@@ -14,8 +14,8 @@ Pins pins[] = {
     Pins(1, 9, "AC_EN"),
     Pins(1, 10, "QW_EN"),
     Pins(1, 13, "TEST_IND"),
-    Pins(1, 11, "BATT_EN"),
-    Pins(1, 12, "RELAY4")
+    Pins(1, 12, "BATT_EN"),
+    Pins(1, 11, "RELAY4")
 };
 
 char serial_command_buffer_[32];
