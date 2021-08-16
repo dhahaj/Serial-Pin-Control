@@ -7,15 +7,15 @@
 Pins pins[] = {
     Pins(1, 2, "LOW_BATT"),
     Pins(1, 3, "TEST_MODE"),
+    Pins(1, 4, "BATT_EN"),
     Pins(1, 5, "REMOTE"),
     Pins(1, 6, "PAD"),
     Pins(0, 7, "RELAY_IN"),
     Pins(1, 8, "OKC"),
-    Pins(1, 9, "AC_EN"),
-    Pins(1, 10, "QW_EN"),
+    Pins(1, 9, "AC_RELAY"),
     Pins(1, 13, "TEST_IND"),
-    Pins(1, 12, "BATT_EN"),
-    Pins(1, 11, "RELAY4")
+    Pins(1, 12, "RELAY1"),
+    Pins(1, 11, "RELAY2")
 };
 
 char serial_command_buffer_[32];
@@ -39,7 +39,7 @@ SerialCommand handleCommand_(CMD, handleCommand);
 void setup() {
     for (int i = 2; i < 14; i++)
         pinMode(i, (i == 7 ? INPUT : OUTPUT));
-    Serial.begin(9600);
+    Serial.begin(115200);
     command.SetDefaultHandler(cmd_unrecognized);
     command.AddCommand(&cmd_on_);
     command.AddCommand(&cmd_off_);
@@ -63,8 +63,6 @@ void checkPins(char* p) {
 
 }
 
-
-
 Pins findPin(const char* n)
 {
     for(int i = 0; i <= 11; i++)
@@ -72,7 +70,3 @@ Pins findPin(const char* n)
             return pins[i];
     return Pins();
 }
-
-
-
-
